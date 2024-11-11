@@ -32,6 +32,9 @@ namespace DWXConnect {
         private string pathOrdersStored;
         private string pathMessagesStored;
         private string pathCommandsPrefix;
+        private string pathDwxFolder;
+        private string historyDataFilePattern = "DWX_Historic_Data*txt";
+        private string historyTickDataFilePattern = "DWX_Historic_Tick_Data*txt";
 
         private int maxCommandFiles = 20;
         private int commandID = 0;
@@ -42,13 +45,15 @@ namespace DWXConnect {
         private string lastBarDataStr = "";
         private string lastHistoricDataStr = "";
         private string lastHistoricTradesStr = "";
+        private DirectoryInfo directoryInfo;
 
         public JObject openOrders = new JObject();
         public JObject accountInfo = new JObject();
         public Dictionary<string, object> marketData = new Dictionary<string, object>();
-        public JObject barData = new JObject();
+        public Dictionary<string, object> barData = new Dictionary<string, object>();
         public JObject historicData = new JObject();
-        public JObject historicTrades = new JObject();
+        //public JObject historicTrades = new JObject();
+        public Dictionary<string, object> historicTrades = new Dictionary<string, object>();
 
         private JObject lastBarData = new JObject();
         private JObject lastMarketData = new JObject();
@@ -61,6 +66,7 @@ namespace DWXConnect {
         private Thread marketDataThread;
         private Thread barDataThread;
         private Thread historicDataThread;
+        private Thread historicTickDataThread;
 
         public Client(EventHandler eventHandler, string MetaTraderDirPath, int sleepDelay, int maxRetryCommandSeconds,
             bool loadOrdersFromFile, bool verbose) {
@@ -75,7 +81,8 @@ namespace DWXConnect {
                 print("ERROR: MetaTraderDirPath does not exist! MetaTraderDirPath: " + MetaTraderDirPath);
                 Environment.Exit(1);
             }
-
+    
+            this.pathDwxFolder =  Path.Join(MetaTraderDirPath, "DWX");
             this.pathOrders = Path.Join(MetaTraderDirPath, "DWX", "DWX_Orders.txt");
             this.pathMessages = Path.Join(MetaTraderDirPath, "DWX", "DWX_Messages.txt");
             this.pathMarketData = Path.Join(MetaTraderDirPath, "DWX", "DWX_Market_Data.txt");
@@ -85,6 +92,8 @@ namespace DWXConnect {
             this.pathOrdersStored = Path.Join(MetaTraderDirPath, "DWX", "DWX_Orders_Stored.txt");
             this.pathMessagesStored = Path.Join(MetaTraderDirPath, "DWX", "DWX_Messages_Stored.txt");
             this.pathCommandsPrefix = Path.Join(MetaTraderDirPath, "DWX", "DWX_Commands_");
+            
+            this.directoryInfo = new DirectoryInfo(pathDwxFolder);
 
             loadMessages();
 
@@ -96,14 +105,17 @@ namespace DWXConnect {
             // this.messageThread = new Thread(() => checkMessages());
             // this.messageThread.Start();
             //
-            // this.marketDataThread = new Thread(() => checkMarketData());
-            // this.marketDataThread.Start();
+            this.marketDataThread = new Thread(() => checkMarketData());
+            this.marketDataThread.Start();
+            
+            this.barDataThread = new Thread(() => checkBarData());
+            this.barDataThread.Start();
             //
-            // this.barDataThread = new Thread(() => checkBarData());
-            // this.barDataThread.Start();
-            //
-            // this.historicDataThread = new Thread(() => checkHistoricData());
-            // this.historicDataThread.Start();
+            this.historicDataThread = new Thread(() => checkHistoricData());
+            this.historicDataThread.Start();
+            
+            this.historicTickDataThread = new Thread(() => checkHistoricTickData());
+            this.historicTickDataThread.Start();
 
             resetCommandIDs();
 
@@ -291,40 +303,40 @@ namespace DWXConnect {
 
                 lastBarDataStr = text;
 
-                JObject data;
+                Dictionary<string, object> dataDict;
 
                 try {
-                    data = JObject.Parse(text);
+                    dataDict = JsonConvert.DeserializeObject<Dictionary<string, object>>(text);
                 }
                 catch {
                     continue;
                 }
 
-                if (data == null) continue;
+                if (dataDict == null) continue;
 
-                barData = data;
+                barData = dataDict;
 
                 if (eventHandler != null) {
-                    foreach (var x in barData) {
-                        string st = x.Key;
-                        if (lastBarData[st] == null || !barData[st].Equals(lastBarData[st])) {
-                            string[] stSplit = st.Split("_");
-                            if (stSplit.Length != 2) continue;
-                            // JObject jo = (JObject)barData[symbol];
-                            eventHandler.onBarData(this,
-                                stSplit[0],
-                                stSplit[1],
-                                (String)barData[st]["time"],
-                                (double)barData[st]["open"],
-                                (double)barData[st]["high"],
-                                (double)barData[st]["low"],
-                                (double)barData[st]["close"],
-                                (int)barData[st]["tick_volume"]);
-                        }
+                    var records = JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(dataDict["data"].ToString());
+                    foreach (var record in records) {
+                        string st= record["instrument"].ToString();
+                       string[] stSplit = st.Split("_");
+                        if (stSplit.Length != 2) continue;
+                        // JObject jo = (JObject)barData[symbol];
+                        eventHandler.onBarData(this,
+                            stSplit[0],
+                            stSplit[1],
+                            record["time"].ToString(),
+                            Convert.ToDouble(record["open"]),
+                            Convert.ToDouble(record["high"]),
+                            Convert.ToDouble(record["low"]),
+                            Convert.ToDouble(record["close"]),
+                            Convert.ToInt32(record["tick_volume"]));
+                        
                     }
                 }
 
-                lastBarData = data;
+                //lastBarData = data;
             }
         }
 
@@ -337,61 +349,107 @@ namespace DWXConnect {
                 Thread.Sleep(sleepDelay);
 
                 if (!START) continue;
+                string text;
+                foreach (var historicDataFileInfo in directoryInfo.GetFiles(historyDataFilePattern))
+                {
+                    var fullFileName = historicDataFileInfo.FullName;
+                    text = tryReadFile(fullFileName);
+                    
+                    if (text.Length > 0) {
+                        lastHistoricDataStr = text;
 
-                string text = tryReadFile(pathHistoricData);
+                        Dictionary<string, object> dataDict;
+                        
 
-                if (text.Length > 0 && !text.Equals(lastHistoricDataStr)) {
-                    lastHistoricDataStr = text;
-
-                    JObject data;
-
-                    try {
-                        data = JObject.Parse(text);
-                    }
-                    catch {
-                        data = null;
-                    }
-
-                    if (data != null) {
-                        foreach (var x in data) {
-                            historicData[x.Key] = data[x.Key];
+                        try {
+                            dataDict = JsonConvert.DeserializeObject<Dictionary<string, object>>(text);
+                        } catch {
+                            continue;
                         }
 
-                        tryDeleteFile(pathHistoricData);
+                        if (dataDict != null) {
+                            
+                            tryDeleteFile(fullFileName);
 
-                        if (eventHandler != null) {
-                            foreach (var x in data) {
-                                string st = x.Key;
-                                string[] stSplit = st.Split("_");
-                                if (stSplit.Length != 2) continue;
-                                // JObject jo = (JObject)barData[symbol];
-                                eventHandler.onHistoricData(this, stSplit[0], stSplit[1], (JObject)data[x.Key]);
+                            if (eventHandler != null) {
+                                var records = JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(dataDict["data"].ToString());
+                                foreach (var record in records) {
+                                    
+                                    eventHandler.onHistoricData(this, dataDict["instrument"].ToString(), dataDict["time_frame"].ToString(), record);
+                                }
                             }
                         }
                     }
                 }
 
+                
+
+                
+
                 // also check historic trades in the same thread. 
                 text = tryReadFile(pathHistoricTrades);
 
-                if (text.Length > 0 && !text.Equals(lastHistoricTradesStr)) {
+                if (text.Length > 0 ) {
                     lastHistoricTradesStr = text;
 
-                    JObject data;
+                    Dictionary<string, object> dataDict;
 
                     try {
-                        data = JObject.Parse(text);
+                        dataDict = JsonConvert.DeserializeObject<Dictionary<string, object>>(text);
                     }
                     catch {
-                        data = null;
+                        dataDict = null;
                     }
 
-                    if (data != null) {
-                        historicTrades = data;
+                    if (dataDict != null) {
+                        historicTrades = dataDict;
 
                         tryDeleteFile(pathHistoricTrades);
 
                         if (eventHandler != null) eventHandler.onHistoricTrades(this);
+                    }
+                }
+            }
+        }
+        
+        /*Regularly checks the file for historic data and triggers
+        the eventHandler.onHistoricTickData() function.
+        */
+        private void checkHistoricTickData() {
+            while (ACTIVE) {
+                Thread.Sleep(sleepDelay);
+
+                if (!START) continue;
+                string text;
+                foreach (var historicTickDataFileInfo in directoryInfo.GetFiles(historyTickDataFilePattern))
+                {
+                    var fullFileName = historicTickDataFileInfo.FullName;
+                    text = tryReadFile(fullFileName);
+                    
+                    if (text.Length > 0) {
+                        lastHistoricDataStr = text;
+
+                        Dictionary<string, object> dataDict;
+                        
+
+                        try {
+                            dataDict = JsonConvert.DeserializeObject<Dictionary<string, object>>(text);
+                        } catch {
+                            continue;
+                        }
+
+                        if (dataDict != null) {
+                            
+                            tryDeleteFile(fullFileName);
+
+                            if (eventHandler != null) {
+                                var records = JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(dataDict["data"].ToString());
+                                foreach (var record in records) {
+                                    
+                                    eventHandler.onHistoricTickData(this, dataDict["instrument"].ToString(), record);
+                                }
+                            }
+                        }
                     }
                 }
             }
