@@ -176,7 +176,8 @@ int OnInit() {
         Print("EventSetMillisecondTimer() returned an error: ", ErrorDescription(GetLastError()));
         return INIT_FAILED;
     }
-   Print("Starting communication server.....");
+
+    Print("Starting communication server.....");
     ResetFolder();
     ResetCommandIDs();
     ArrayResize(lastMessages, numLastMessages);
@@ -804,7 +805,7 @@ void GetHistoricData(string dataStr) {
     }
 
     int i = 0;
-    float files_double = (float) rates_count / MAXIMUM_RECORDS_SIZE;
+    float files_double = (float)rates_count / MAXIMUM_RECORDS_SIZE;
     int numberOfFiles = (int)MathCeil(files_double);
 
 //Print("Printing Historic data found " + rates_count + ", creating files: " + numberOfFiles + ", in doubles " + files_double);
@@ -814,7 +815,8 @@ void GetHistoricData(string dataStr) {
         // file write limit
         bool first = true;
         //string text = "{\"" + symbol + "_" + TimeFrameToString(timeFrame) + "\": {";
-        string text = "{\"instrument\": \"" + symbol + "\", \"time_frame\": \"" + TimeFrameToString(timeFrame) + "\",\n \"command\": \"HISTORIC_DATA\",\n  \"data\":[";
+        string text = "{\"instrument\": \"" + symbol + "\", \"time_frame\": \"" + TimeFrameToString(timeFrame) +
+                      "\",\n \"command\": \"HISTORIC_DATA\",\n  \"data\":[";
 
         for (; i < recordLimit; i++) {
             if (first) {
@@ -823,9 +825,9 @@ void GetHistoricData(string dataStr) {
                     (timeFrame == PERIOD_W1 && daysDifference > 10) ||
                     (timeFrame < PERIOD_W1 && daysDifference > 3)) {
                     if (fileCounter == 1) {
-                     SendInfo(StringFormat(
-                        "The difference between requested start date and returned start date is relatively large (%.1f days). Maybe the data is not available on MetaTrader.",
-                        daysDifference));
+                        SendInfo(StringFormat(
+                            "The difference between requested start date and returned start date is relatively large (%.1f days). Maybe the data is not available on MetaTrader.",
+                            daysDifference));
                     }
                 }
                 // Print(dateStart, " | ", rates_array[i].time, " | ", daysDifference);
@@ -944,49 +946,48 @@ void GetHistoricTickData(string dataStr) {
                 GetLastError()));
         return;
     }
-    
+
     int i = 0;
 
-      float files_double = (float) ticks / MAXIMUM_RECORDS_SIZE;
+    float files_double = (float)ticks / MAXIMUM_RECORDS_SIZE;
     int numberOfFiles = (int)MathCeil(files_double);
 
 
     for (int fileCounter = 1; fileCounter <= numberOfFiles; fileCounter++) {
-       bool first = true;
-       string text = "{\"instrument\": \"" + symbol + "\", \"command\": \"HISTORIC_TICK_DATA\",  \"data\":[";
-       int recordLimit = MathMin(ticks, fileCounter * MAXIMUM_RECORDS_SIZE);
-   
-       for (; i < recordLimit; i++) {
-           if (first) {
-               datetime lastticktime = tick_array[0].time;
-               datetime firstticktime = tick_array[ticks - 1].time;
-               if (fileCounter == 1) {
-                  SendInfo(StringFormat(
-                   "First tick time = %s.%03I64u, Last tick time = %s.%03I64u",
-                   TimeToString(lastticktime, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-                   tick_array[0].time_msc % 1000,
-                   TimeToString(firstticktime, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-                   tick_array[ticks - 1].time_msc % 1000));
-               }
-               
-           } else {
-               text += ",\n\t";
-           }
-   
-           // maybe use integer instead of time string? IntegerToString(rates_array[i].time)
-           text += GetTickDescription(tick_array[i]);
-   
-           first = false;
-       }
-   
-       text += "\n]}";
-   
-       for (int i = 0; i < 5; i++) {
-           if (WriteToFile(filePathHistoricTickData, text, fileCounter - 1)) break;
-           Sleep(100);
-       }
+        bool first = true;
+        string text = "{\"instrument\": \"" + symbol + "\", \"command\": \"HISTORIC_TICK_DATA\",  \"data\":[";
+        int recordLimit = MathMin(ticks, fileCounter * MAXIMUM_RECORDS_SIZE);
+
+        for (; i < recordLimit; i++) {
+            if (first) {
+                datetime lastticktime = tick_array[0].time;
+                datetime firstticktime = tick_array[ticks - 1].time;
+                if (fileCounter == 1) {
+                    SendInfo(StringFormat(
+                        "First tick time = %s.%03I64u, Last tick time = %s.%03I64u",
+                        TimeToString(lastticktime, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
+                        tick_array[0].time_msc % 1000,
+                        TimeToString(firstticktime, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
+                        tick_array[ticks - 1].time_msc % 1000));
+                }
+            } else {
+                text += ",\n\t";
+            }
+
+            // maybe use integer instead of time string? IntegerToString(rates_array[i].time)
+            text += GetTickDescription(tick_array[i]);
+
+            first = false;
+        }
+
+        text += "\n]}";
+
+        for (int i = 0; i < 5; i++) {
+            if (WriteToFile(filePathHistoricTickData, text, fileCounter - 1)) break;
+            Sleep(100);
+        }
     }
-    
+
     SendInfo(StringFormat("Successfully read historic tick data for %s_%s_%s.", symbol, data[1], data[2]));
 }
 
@@ -1041,7 +1042,10 @@ void GetHistoricTrades(string dataStr) {
 //| Returns the string description of a tick                         |
 //+------------------------------------------------------------------+
 string GetTickDescription(MqlTick &tick) {
-    string desc = StringFormat("{\"time\" : \"%s.%03d-00:00\",  \"flag\": %G, ", TimeToString(tick.time), tick.time_msc%1000, tick.flags);
+    string desc = StringFormat("{\"time\" : \"%s.%03d-00:00\",  \"flag\": %G, ",
+        TimeToString(tick.time),
+        tick.time_msc % 1000,
+        tick.flags);
 
     //--- Checking flags
     bool buy_tick = ((tick.flags & TICK_FLAG_BUY) == TICK_FLAG_BUY);
@@ -1091,7 +1095,8 @@ void CheckMarketData() {
                 lastTick.bid,
                 lastTick.ask,
                 lastTick.last,
-                TimeToString(lastTick.time), lastTick.time_msc%1000,
+                TimeToString(lastTick.time),
+                lastTick.time_msc % 1000,
                 lastTick.volume,
                 lastTick.flags,
                 SymbolInfoDouble(MarketDataSymbols[i], SYMBOL_TRADE_TICK_VALUE));
@@ -1106,7 +1111,7 @@ void CheckMarketData() {
     }
 
     text += "\n]}";
-   //Print("CheckMarketData", text);
+    //Print("CheckMarketData", text);
     // only write to file if there was a change. 
     if (text == lastMarketDataText) return;
 
@@ -1122,7 +1127,7 @@ void CheckBarData() {
 
     bool newData = false;
     //string text = "{";
-      string text = "{\"data\": [";
+    string text = "{\"data\": [";
     for (int s = 0; s < ArraySize(BarDataInstruments); s++) {
         MqlRates curr_rate[];
 
@@ -1158,26 +1163,26 @@ void CheckBarData() {
 
 ENUM_TIMEFRAMES StringToTimeFrame(string tf) {
     // Standard timeframes
-    if (tf == "M1")  return PERIOD_M1;
-    if (tf == "M2")  return PERIOD_M2;
-    if (tf == "M3")  return PERIOD_M3;
-    if (tf == "M4")  return PERIOD_M4;
-    if (tf == "M5")  return PERIOD_M5;
-    if (tf == "M6")  return PERIOD_M6;
+    if (tf == "M1") return PERIOD_M1;
+    if (tf == "M2") return PERIOD_M2;
+    if (tf == "M3") return PERIOD_M3;
+    if (tf == "M4") return PERIOD_M4;
+    if (tf == "M5") return PERIOD_M5;
+    if (tf == "M6") return PERIOD_M6;
     if (tf == "M10") return PERIOD_M10;
     if (tf == "M12") return PERIOD_M12;
     if (tf == "M15") return PERIOD_M15;
     if (tf == "M20") return PERIOD_M20;
     if (tf == "M30") return PERIOD_M30;
-    if (tf == "H1")  return PERIOD_H1;
-    if (tf == "H2")  return PERIOD_H2;
-    if (tf == "H3")  return PERIOD_H3;
-    if (tf == "H4")  return PERIOD_H4;
-    if (tf == "H6")  return PERIOD_H6;
-    if (tf == "H8")  return PERIOD_H8;
+    if (tf == "H1") return PERIOD_H1;
+    if (tf == "H2") return PERIOD_H2;
+    if (tf == "H3") return PERIOD_H3;
+    if (tf == "H4") return PERIOD_H4;
+    if (tf == "H6") return PERIOD_H6;
+    if (tf == "H8") return PERIOD_H8;
     if (tf == "H12") return PERIOD_H12;
-    if (tf == "D1")  return PERIOD_D1;
-    if (tf == "W1")  return PERIOD_W1;
+    if (tf == "D1") return PERIOD_D1;
+    if (tf == "W1") return PERIOD_W1;
     if (tf == "MN1") return PERIOD_MN1;
     return -1;
 }
@@ -1421,47 +1426,47 @@ bool OpenChartIfNotOpen(string symbol, ENUM_TIMEFRAMES timeFrame) {
 
 // use string so that we can have the same in MT5. 
 string OrderTypeToString(int orderType) {
-    if (orderType == POSITION_TYPE_BUY)      return "buy";
-    if (orderType == POSITION_TYPE_SELL)     return "sell";
-    if (orderType == ORDER_TYPE_BUY_LIMIT)   return "buylimit";
-    if (orderType == ORDER_TYPE_SELL_LIMIT)  return "selllimit";
-    if (orderType == ORDER_TYPE_BUY_STOP)    return "buystop";
-    if (orderType == ORDER_TYPE_SELL_STOP)   return "sellstop";
+    if (orderType == POSITION_TYPE_BUY) return "buy";
+    if (orderType == POSITION_TYPE_SELL) return "sell";
+    if (orderType == ORDER_TYPE_BUY_LIMIT) return "buylimit";
+    if (orderType == ORDER_TYPE_SELL_LIMIT) return "selllimit";
+    if (orderType == ORDER_TYPE_BUY_STOP) return "buystop";
+    if (orderType == ORDER_TYPE_SELL_STOP) return "sellstop";
     return "unknown";
 }
 
 
 int StringToOrderType(string orderTypeStr) {
-    if (orderTypeStr == "buy")         return POSITION_TYPE_BUY;
-    if (orderTypeStr == "sell")        return POSITION_TYPE_SELL;
-    if (orderTypeStr == "buylimit")    return ORDER_TYPE_BUY_LIMIT;
-    if (orderTypeStr == "selllimit")   return ORDER_TYPE_SELL_LIMIT;
-    if (orderTypeStr == "buystop")     return ORDER_TYPE_BUY_STOP;
-    if (orderTypeStr == "sellstop")    return ORDER_TYPE_SELL_STOP;
+    if (orderTypeStr == "buy") return POSITION_TYPE_BUY;
+    if (orderTypeStr == "sell") return POSITION_TYPE_SELL;
+    if (orderTypeStr == "buylimit") return ORDER_TYPE_BUY_LIMIT;
+    if (orderTypeStr == "selllimit") return ORDER_TYPE_SELL_LIMIT;
+    if (orderTypeStr == "buystop") return ORDER_TYPE_BUY_STOP;
+    if (orderTypeStr == "sellstop") return ORDER_TYPE_SELL_STOP;
     return -1;
 }
 
 string HistoryDealTypeToString(int dealType) {
-    if (dealType == DEAL_TYPE_BUY)           return "buy";
-    if (dealType == DEAL_TYPE_SELL)          return "sell";
-    if (dealType == DEAL_TYPE_BUY_CANCELED)  return "buy canceled";
+    if (dealType == DEAL_TYPE_BUY) return "buy";
+    if (dealType == DEAL_TYPE_SELL) return "sell";
+    if (dealType == DEAL_TYPE_BUY_CANCELED) return "buy canceled";
     if (dealType == DEAL_TYPE_SELL_CANCELED) return "sell canceled";
-    if (dealType == DEAL_TYPE_BALANCE)       return "balance";
-    if (dealType == DEAL_TYPE_COMMISSION)    return "commission";
-    if (dealType == DEAL_TYPE_BONUS)         return "bonus";
-    if (dealType == DEAL_TYPE_CHARGE)        return "charge";
-    if (dealType == DEAL_TYPE_CREDIT)        return "credit";
-    if (dealType == DEAL_TYPE_CORRECTION)    return "correction";
-    if (dealType == DEAL_TYPE_INTEREST)      return "interest";
+    if (dealType == DEAL_TYPE_BALANCE) return "balance";
+    if (dealType == DEAL_TYPE_COMMISSION) return "commission";
+    if (dealType == DEAL_TYPE_BONUS) return "bonus";
+    if (dealType == DEAL_TYPE_CHARGE) return "charge";
+    if (dealType == DEAL_TYPE_CREDIT) return "credit";
+    if (dealType == DEAL_TYPE_CORRECTION) return "correction";
+    if (dealType == DEAL_TYPE_INTEREST) return "interest";
     return "unknown";
 }
 
 string HistoryDealEntryTypeToString(int entryType) {
-    if (entryType == DEAL_ENTRY_IN)       return "entry_in";
-    if (entryType == DEAL_ENTRY_OUT)      return "entry_out";
-    if (entryType == DEAL_ENTRY_OUT_BY)   return "entry_out_by";
-    if (entryType == DEAL_ENTRY_INOUT)    return "in_out";
-    if (entryType == DEAL_ENTRY_STATE)    return "state";
+    if (entryType == DEAL_ENTRY_IN) return "entry_in";
+    if (entryType == DEAL_ENTRY_OUT) return "entry_out";
+    if (entryType == DEAL_ENTRY_OUT_BY) return "entry_out_by";
+    if (entryType == DEAL_ENTRY_INOUT) return "in_out";
+    if (entryType == DEAL_ENTRY_STATE) return "state";
     return "unknown";
 }
 
@@ -1493,31 +1498,30 @@ void ResetFolder() {
 }
 
 void DeleteFile(string filePatt) {
-   string file_name;
-   int    i=1;
+    string file_name;
+    int i = 1;
 //--- receive search handle in local folders' root
-   long search_handle=FileFindFirst(filePatt + "*",file_name);
+    long search_handle = FileFindFirst(filePatt + "*", file_name);
 //--- check if FileFindFirst() function executed successfully
-   if(search_handle != INVALID_HANDLE) {
-      //--- check if the passed strings are file or directory names in the loop
-      do {
-         ResetLastError();
-         
-         int pos = StringFind(file_name, "Stored");
-         if(pos >= 0) continue;
-         
-         //--- if this is a file, the function will return true, if it is a directory, the function will generate error
-         FileIsExist(file_name);
-         PrintFormat("%d : %s name = %s", i, GetLastError() == 5018 ? "Directory" : "File",file_name);
-         FileDelete(folderName + "/" + file_name);
-         i++;
-      } while(FileFindNext(search_handle,file_name));
-      //--- close search handle
-      FileFindClose(search_handle);
-     }
-   else
-      Print("Files not found! " + filePatt);
- 
+    if (search_handle != INVALID_HANDLE) {
+        //--- check if the passed strings are file or directory names in the loop
+        do {
+            ResetLastError();
+
+            int pos = StringFind(file_name, "Stored");
+            if (pos >= 0) continue;
+
+            //--- if this is a file, the function will return true, if it is a directory, the function will generate error
+            FileIsExist(file_name);
+            PrintFormat("%d : %s name = %s", i, GetLastError() == 5018 ? "Directory" : "File", file_name);
+            FileDelete(folderName + "/" + file_name);
+            i++;
+        } while (FileFindNext(search_handle, file_name));
+
+        //--- close search handle
+        FileFindClose(search_handle);
+    } else
+        Print("Files not found! " + filePatt);
 }
 
 
