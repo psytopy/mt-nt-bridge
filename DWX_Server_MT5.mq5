@@ -51,7 +51,7 @@ input bool asyncMode = false;
 
 int maxCommandFiles = 50;
 int maxNumberOfCharts = 100;
-int MAXIMUM_RECORDS_SIZE = 5;
+int MAXIMUM_RECORDS_SIZE = 1000;
 
 long lastMessageMillis = 0;
 long lastUpdateMillis = GetTickCount(),
@@ -808,7 +808,7 @@ void GetHistoricData(string dataStr) {
     int numberOfFiles = (int)MathCeil(files_double);
 
 //Print("Printing Historic data found " + rates_count + ", creating files: " + numberOfFiles + ", in doubles " + files_double);
-    for (int fileCounter = 0; fileCounter <= numberOfFiles; fileCounter++) {
+    for (int fileCounter = 1; fileCounter <= numberOfFiles; fileCounter++) {
         int recordLimit = MathMin(rates_count, fileCounter * MAXIMUM_RECORDS_SIZE);
 
         // file write limit
@@ -822,9 +822,11 @@ void GetHistoricData(string dataStr) {
                 if ((timeFrame == PERIOD_MN1 && daysDifference > 33) ||
                     (timeFrame == PERIOD_W1 && daysDifference > 10) ||
                     (timeFrame < PERIOD_W1 && daysDifference > 3)) {
-                    SendInfo(StringFormat(
+                    if (fileCounter == 1) {
+                     SendInfo(StringFormat(
                         "The difference between requested start date and returned start date is relatively large (%.1f days). Maybe the data is not available on MetaTrader.",
                         daysDifference));
+                    }
                 }
                 // Print(dateStart, " | ", rates_array[i].time, " | ", daysDifference);
             } else {
@@ -948,7 +950,8 @@ void GetHistoricTickData(string dataStr) {
       float files_double = (float) ticks / MAXIMUM_RECORDS_SIZE;
     int numberOfFiles = (int)MathCeil(files_double);
 
-    for (int fileCounter = 0; fileCounter <= numberOfFiles; fileCounter++) {
+
+    for (int fileCounter = 1; fileCounter <= numberOfFiles; fileCounter++) {
        bool first = true;
        string text = "{\"instrument\": \"" + symbol + "\", \"command\": \"HISTORIC_TICK_DATA\",  \"data\":[";
        int recordLimit = MathMin(ticks, fileCounter * MAXIMUM_RECORDS_SIZE);
@@ -957,12 +960,15 @@ void GetHistoricTickData(string dataStr) {
            if (first) {
                datetime lastticktime = tick_array[0].time;
                datetime firstticktime = tick_array[ticks - 1].time;
-               SendInfo(StringFormat(
+               if (fileCounter == 1) {
+                  SendInfo(StringFormat(
                    "First tick time = %s.%03I64u, Last tick time = %s.%03I64u",
                    TimeToString(lastticktime, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
                    tick_array[0].time_msc % 1000,
                    TimeToString(firstticktime, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
                    tick_array[ticks - 1].time_msc % 1000));
+               }
+               
            } else {
                text += ",\n\t";
            }
@@ -1006,7 +1012,7 @@ void GetHistoricTrades(string dataStr) {
         else
             first = false;
         text += StringFormat(
-            "{\"ticket\": \"%llu\",\"magic\": %d, \"symbol\": \"%s\", \"lots\": %.2f, \"type\": \"%s\", \"entry\": \"%s\", \"deal_time\": \"%s\", \"deal_price\": %.5f, \"pnl\": %.2f, \"commission\": %.2f, \"swap\": %.2f, \"comment\": \"%s\"}",
+            "{\"ticket\": \"%llu\",\"magic\": %d, \"symbol\": \"%s\", \"lots\": %.2f, \"type\": \"%s\", \"entry\": \"%s\", \"deal_time\": \"%s-00:00\", \"deal_price\": %.5f, \"pnl\": %.2f, \"commission\": %.2f, \"swap\": %.2f, \"comment\": \"%s\"}",
             ticket,
             HistoryDealGetInteger(ticket, DEAL_MAGIC),
             HistoryDealGetString(ticket, DEAL_SYMBOL),
@@ -1035,7 +1041,7 @@ void GetHistoricTrades(string dataStr) {
 //| Returns the string description of a tick                         |
 //+------------------------------------------------------------------+
 string GetTickDescription(MqlTick &tick) {
-    string desc = StringFormat("{\"time\" : \"%s.%03d\",  \"flag\": %G, ", TimeToString(tick.time), tick.time_msc%1000, tick.flags);
+    string desc = StringFormat("{\"time\" : \"%s.%03d-00:00\",  \"flag\": %G, ", TimeToString(tick.time), tick.time_msc%1000, tick.flags);
 
     //--- Checking flags
     bool buy_tick = ((tick.flags & TICK_FLAG_BUY) == TICK_FLAG_BUY);
@@ -1080,7 +1086,7 @@ void CheckMarketData() {
             if (!first) text += ",\n\t";
 
             text += StringFormat(
-                "{\"instrument\": \"%s\", \"bid\": %.5f, \"ask\": %.5f, \"last\": %.5f, \"time\" : \"%s.%03d\", \"volume\": %d, \"flag\": %G, \"tick_value\": %.5f }",
+                "{\"instrument\": \"%s\", \"bid\": %.5f, \"ask\": %.5f, \"last\": %.5f, \"time\" : \"%s.%03d-00:00\", \"volume\": %d, \"flag\": %G, \"tick_value\": %.5f }",
                 MarketDataSymbols[i],
                 lastTick.bid,
                 lastTick.ask,
@@ -1124,7 +1130,7 @@ void CheckBarData() {
         // if last rate is returned and its timestamp is greater than the last published...
         if (count > 0 && curr_rate[0].time > BarDataInstruments[s].getLastPublishTimestamp()) {
             string rates = StringFormat(
-                "{\"instrument\": \"%s\", \"time\": \"%s\", \"open\": %f, \"high\": %f, \"low\": %f, \"close\": %f, \"tick_volume\":%d}, ",
+                "{\"instrument\": \"%s\", \"time\": \"%s-00:00\", \"open\": %f, \"high\": %f, \"low\": %f, \"close\": %f, \"tick_volume\":%d}, ",
                 BarDataInstruments[s].name(),
                 TimeToString(curr_rate[0].time),
                 curr_rate[0].open,
