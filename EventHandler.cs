@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 
 
@@ -19,7 +20,9 @@ namespace DWXConnect
 
         public void onBarData(Client dwx, string symbol, string timeFrame, string time, double open, double high, double low, double close, int tickVolume);
 
-        public void onHistoricData(Client dwx, string symbol, string timeFrame, JObject data);
+        public void onHistoricData(Client dwx, string symbol, string timeFrame, Dictionary<string, object> data);
+        
+        public void onHistoricTickData(Client dwx, string symbol, Dictionary<string, object> data);
 
         public void onHistoricTrades(Client dwx);
 
